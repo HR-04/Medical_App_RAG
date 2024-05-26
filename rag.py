@@ -9,17 +9,26 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 from qdrant_client import QdrantClient
 from langchain_community.vectorstores import Qdrant
-from langchain_qdrant import Qdrant
 import os
 import json
 from huggingface_hub import login
-login(token="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")
+import logging
+
+# from langchain_community.embeddings import OllamaEmbeddings
+
+
+# Enable logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Hugging Face login
+try:
+    login(token="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")
+    logging.debug("Hugging Face login successful.")
+except Exception as e:
+    logging.error(f"Error during Hugging Face login: {e}")
 
 import warnings
 warnings.filterwarnings('ignore', category=FutureWarning, module='huggingface_hub.file_download')
-
-
-
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -38,14 +47,16 @@ config = {
     'threads': int(os.cpu_count() / 2)
 }
 
-llm = CTransformers(
-    model=local_llm,
-    model_type="llama",
-    lib="avx2",
-    **config
-)
-
-print("LLM Initialized....")
+try:
+    llm = CTransformers(
+        model=local_llm,
+        model_type="llama",
+        lib="avx2",
+        **config
+    )
+    logging.debug("LLM Initialized.")
+except Exception as e:
+    logging.error(f"Error initializing LLM: {e}")
 
 prompt_template = """Use the following pieces of information to answer the user's question.
 If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -57,19 +68,36 @@ Only return the helpful answer below and nothing else.
 Helpful answer:
 """
 
-embeddings = SentenceTransformerEmbeddings(model_name="NeuML/pubmedbert-base-embeddings")
+try:
+    embeddings = SentenceTransformerEmbeddings(model_name="NeuML/pubmedbert-base-embeddings")
+    # embeddings = OllamaEmbeddings(model = "llama3")
+    logging.debug("Embeddings model initialized.")
+except Exception as e:
+    logging.error(f"Error initializing embeddings model: {e}")
 
 url = "http://localhost:6333"
 
-client = QdrantClient(
-    url=url, prefer_grpc=False
-)
+try:
+    client = QdrantClient(
+        url=url, prefer_grpc=False
+    )
+    logging.debug("Qdrant client initialized.")
+except Exception as e:
+    logging.error(f"Error initializing Qdrant client: {e}")
 
-db = Qdrant(client=client, embeddings=embeddings, collection_name="vector_db")
+try:
+    db = Qdrant(client=client, embeddings=embeddings, collection_name="vector_database")
+    logging.debug("Qdrant database initialized.")
+except Exception as e:
+    logging.error(f"Error initializing Qdrant database: {e}")
 
 prompt = PromptTemplate(template=prompt_template, input_variables=['context', 'question'])
 
-retriever = db.as_retriever(search_kwargs={"k": 1})
+try:
+    retriever = db.as_retriever(search_kwargs={"k": 1})
+    logging.debug("Retriever initialized.")
+except Exception as e:
+    logging.error(f"Error initializing retriever: {e}")
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -78,20 +106,31 @@ async def read_root(request: Request):
 @app.post("/get_response")
 async def get_response(query: str = Form(...)):
     chain_type_kwargs = {"prompt": prompt}
-    qa = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        return_source_documents=True,
-        chain_type_kwargs=chain_type_kwargs,
-        verbose=True
-    )
-    response = qa(query)
-    print(response)
-    answer = response['result']
-    source_document = response['source_documents'][0].page_content
-    doc = response['source_documents'][0].metadata['source']
-    response_data = jsonable_encoder({"answer": answer, "source_document": source_document, "doc": doc})
+    try:
+        qa = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            return_source_documents=True,
+            chain_type_kwargs=chain_type_kwargs,
+            verbose=True
+        )
+        logging.debug("RetrievalQA initialized.")
+        
+        response = qa(query)
+        logging.debug(f"Response generated: {response}")
+        
+        answer = response['result']
+        source_document = response['source_documents'][0].page_content
+        doc = response['source_documents'][0].metadata['source']
+        
+        response_data = jsonable_encoder({"answer": answer, "source_document": source_document, "doc": doc})
+        return Response(content=response_data)
+    except Exception as e:
+        logging.error(f"Error during query processing: {e}")
+        return Response(content="Internal Server Error", status_code=500)
 
-    res = Response(response_data)
-    return res
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+    #http://localhost:6333/dashboard

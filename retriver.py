@@ -1,9 +1,11 @@
 from langchain_community.vectorstores import Qdrant
 from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
 
 from qdrant_client import QdrantClient
 
 embeddings = SentenceTransformerEmbeddings(model_name = "NeuML/pubmedbert-base-embeddings")
+# embeddings = OllamaEmbeddings(model = "llama3")
 
 url = "http://localhost:6333/dashboard"
 
