@@ -124,8 +124,9 @@ async def get_response(query: str = Form(...)):
         source_document = response['source_documents'][0].page_content
         doc = response['source_documents'][0].metadata['source']
         
-        response_data = jsonable_encoder({"answer": answer, "source_document": source_document, "doc": doc})
-        return Response(content=response_data)
+        response_data = jsonable_encoder(json.dumps({"answer": answer, "source_document": source_document, "doc": doc}))
+        res =  Response(content=response_data)
+        return res
     except Exception as e:
         logging.error(f"Error during query processing: {e}")
         return Response(content="Internal Server Error", status_code=500)
