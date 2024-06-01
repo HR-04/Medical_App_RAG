@@ -39,7 +39,7 @@ It leverages an open-source instruct Large Language Model (LLM), embeddings, and
 ### Steps
 1. **Clone the Repository**
     ```sh
-    git clone https://github.com/yourusername/meditron-chatbot.git
+    git clone https://github.com/HR-04/Medical_App_RAG.git
     cd meditron-chatbot
     ```
 
